@@ -31,8 +31,18 @@ export class SystemApiRecognizer {
     }
 
     recognize(sourceFile: ts.SourceFile, filePath: string) {
+        this.buildScene();
         for (const arkFile of this.scene.getFiles()) {
+            // 打印导入信息
+            console.log(arkFile.getFilePath());
+            for (const importInfo of arkFile.getImportInfos()) {
+                // console.log(importInfo.getImportClauseName(), importInfo.getFrom());
+                console.log(importInfo)
+            }
             for (const arkClass of arkFile.getClasses()) {
+                if (arkClass.getDecorators()) {
+                    this.recognizeDecorators(arkClass);
+                }
                 this.recognizeClass(arkClass);
             }
         }
@@ -55,7 +65,7 @@ export class SystemApiRecognizer {
         for (const stmt of cfg.getStmts()) {
             // 筛选出ArkInvokeStmt
             if (stmt instanceof ArkInvokeStmt) {
-                console.log('nihao');
+                // console.log('nihao');
             }
         }
     }
@@ -78,8 +88,16 @@ export class SystemApiRecognizer {
         //   apiInfo.setApiNode(undefined);
         // });
         return apiDecInfos;
-      }
+    }
 
+    recognizeDecorators(node: ArkClass | ArkMethod) {
+        const decorators = node.getDecorators();
+        for (const decorator of decorators) {
+            const decoratorName = decorator.getContent();
+            // const symbol = this.typeChecker!.getSymbolAtLocation(decoratorName);
+            console.log(decoratorName, decorator.getKind());
+        }
+    }
 }
 
 export class ApiDeclarationInformation {

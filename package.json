@@ -9,6 +9,6 @@
   },
   "devDependencies": {
     "ts-node": "^10.9.2",
-    "typescript": "^5.8.2"
+    "typescript": "npm:ohos-typescript@^4.2.3-r2"
   }
 }
