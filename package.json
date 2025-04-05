@@ -1,0 +1,14 @@
+{
+  "dependencies": {
+    "arkanalyzer": "1.0.7",
+    "browserify-fs": "^1.0.0",
+    "exceljs": "^4.4.0",
+    "log4js": "6.7.1",
+    "source-map": "^0.7.4",
+    "ts-loader": "^9.5.1"
+  },
+  "devDependencies": {
+    "ts-node": "^10.9.2",
+    "typescript": "^5.8.2"
+  }
+}
