@@ -328,9 +328,9 @@ export class Logger {
   static readonly ERROR = 2;
   static readonly logs = '';
   static readonly LEVEL_NAME = new Map([
-    [this.INFO, 'I'],
-    [this.WARN, 'W'],
-    [this.ERROR, 'E']
+    [Logger.INFO, 'I'],
+    [Logger.WARN, 'W'],
+    [Logger.ERROR, 'E']
   ]);
 
   static info(tag: string, message: string): void {

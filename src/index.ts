@@ -47,9 +47,9 @@ export class AppApiCollectorPlugin implements Plugin {
 
   getPluginOptions(): PluginOptions {
     return {
-      name: 'api-collector',
+      name: 'ArkPermission',
       version: '0.1.0',
-      description: 'collect api from app\'s source code.',
+      description: 'A permission analysis tool based on ArkAnalyzer.',
       commands: [
         {
           isRequiredOption: false,

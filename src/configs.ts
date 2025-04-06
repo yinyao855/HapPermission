@@ -1,5 +1,4 @@
-// 定义 ReporterFormat 类
-class ReporterFormat {
+export class ReporterFormat {
   // 定义静态常量
   static readonly FLAG_JSON: number = 0;
   static readonly FLAG_EXCEL: number = 1;
@@ -7,9 +6,9 @@ class ReporterFormat {
 
   // 定义格式映射表
   static readonly formatMap: Map<string, number> = new Map([
-    ['json', this.FLAG_JSON],
-    ['excel', this.FLAG_EXCEL],
-    ['debug', this.FLAG_DEBUG]
+    ['json', ReporterFormat.FLAG_JSON],
+    ['excel', ReporterFormat.FLAG_EXCEL],
+    ['debug', ReporterFormat.FLAG_DEBUG]
   ]);
 
   /**
@@ -23,6 +22,3 @@ class ReporterFormat {
       : this.FLAG_EXCEL;
   }
 }
-
-// 导出 ReporterFormat 类
-export { ReporterFormat };
