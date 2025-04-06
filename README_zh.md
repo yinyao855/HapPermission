@@ -12,3 +12,7 @@ npx ts-node ./src/entry/main.ts --app [app_path] --sdk [sdk_path] --output [outp
 ```shell
 npx ts-node ./src/entry/main.ts --app /Users/yaoyin/DevEcoStudioProjects/FormHost --sdk /Users/yaoyin/Library/OpenHarmony/Sdk/14/ets --output . --format excel
 ```
+
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=yinyao855/arkpermission&type=Date)](https://www.star-history.com/#yinyao855/arkpermission&Date)
