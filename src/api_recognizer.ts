@@ -1,7 +1,15 @@
-import { FileSystem, Logger } from "./utils";
 import { join } from "path";
-import ts from "typescript";
-import { SceneConfig, Scene, ArkInvokeStmt, ArkClass, ArkMethod } from "arkanalyzer";
+import ts from "ohos-typescript";
+import {
+    SceneConfig,
+    Scene,
+    ArkInvokeStmt,
+    ArkClass,
+    ArkMethod,
+    ArkFile,
+    FileSignature,
+    LineColPosition
+} from "arkanalyzer";
 
 export class SystemApiRecognizer {
     systemRoot: string;
@@ -31,18 +39,15 @@ export class SystemApiRecognizer {
     }
 
     recognize(sourceFile: ts.SourceFile, filePath: string) {
-        this.buildScene();
-        for (const arkFile of this.scene.getFiles()) {
-            // 打印导入信息
-            console.log(arkFile.getFilePath());
-            for (const importInfo of arkFile.getImportInfos()) {
-                // console.log(importInfo.getImportClauseName(), importInfo.getFrom());
-                console.log(importInfo)
-            }
+        const fileName = filePath.replace(this.scene.getRealProjectDir() + "/", "");
+        const fromSignature = new FileSignature(this.scene.getProjectName(), fileName);
+        const arkFile = this.scene.getFile(fromSignature);
+        if (arkFile) {
+            // this.recognizeFileImport(arkFile);
             for (const arkClass of arkFile.getClasses()) {
-                if (arkClass.getDecorators()) {
-                    this.recognizeDecorators(arkClass);
-                }
+                // if (arkClass.getDecorators()) {
+                //     this.recognizeDecorators(arkClass);
+                // }
                 this.recognizeClass(arkClass);
             }
         }
@@ -65,7 +70,37 @@ export class SystemApiRecognizer {
         for (const stmt of cfg.getStmts()) {
             // 筛选出ArkInvokeStmt
             if (stmt instanceof ArkInvokeStmt) {
-                // console.log('nihao');
+                const methodSignature = stmt.getInvokeExpr().getMethodSignature();
+                let classSignature = methodSignature.getDeclaringClassSignature();
+                let methodSubSignature = methodSignature.getMethodSubSignature();
+                const apiInfo = new ApiDeclarationInformation();
+                // 模块名
+                const fileSignature = classSignature.getDeclaringFileSignature();
+                // @ts-ignore
+                const packageName = fileSignature?.getFileName()
+                    ?? classSignature.getDeclaringNamespaceSignature()?.getDeclaringFileSignature()?.getFileName()
+                    ?? "unknown";
+                apiInfo.setPackageName(packageName);
+                // 类名
+                let className = classSignature.getClassName();
+                if (className == "_DEFAULT_ARK_CLASS") {
+                    // 替换成namespace名称
+                    if (classSignature.getDeclaringNamespaceSignature()) {
+                        className = classSignature.getDeclaringNamespaceSignature()!.getNamespaceName();
+                    }
+                }
+                apiInfo.setTypeName(className);
+                // 方法名
+                apiInfo.setPropertyName(methodSubSignature.getMethodName());
+                // 函数
+                apiInfo.setApiRawText(methodSubSignature.toString());
+                // 文件位置
+                const sourceFileName = arkMethod.getDeclaringArkFile().getFilePath();
+                apiInfo.setSourceFileName(sourceFileName);
+                const pos = stmt.getOriginPositionInfo();
+                apiInfo.setPosition(pos);
+                // 添加api信息
+                this.addApiInformation(apiInfo);
             }
         }
     }
@@ -96,6 +131,16 @@ export class SystemApiRecognizer {
             const decoratorName = decorator.getContent();
             // const symbol = this.typeChecker!.getSymbolAtLocation(decoratorName);
             console.log(decoratorName, decorator.getKind());
+        }
+    }
+
+    recognizeFileImport(node: ArkFile) {
+        const importInfos = node.getImportInfos();
+        for (const importInfo of importInfos) {
+            const importClauseName = importInfo.getImportClauseName();
+            const from = importInfo.getFrom();
+            console.log(importClauseName, from);
+            console.log(importInfo.getTsSourceCode())
         }
     }
 }
@@ -144,9 +189,8 @@ export class ApiDeclarationInformation {
         }
     }
 
-    setPosition(pos: ts.LineAndCharacter) {
-        const { line, character } = pos;
-        this.pos = `${line + 1},${character + 1}`;
+    setPosition(pos: LineColPosition) {
+        this.pos = `${pos.getLineNo()},${pos.getColNo()}`;
     }
 
     setSourceFileName(sourceFileName: string) {

@@ -8,7 +8,7 @@
     "ts-loader": "^9.5.1"
   },
   "devDependencies": {
-    "ts-node": "^10.9.2",
-    "typescript": "npm:ohos-typescript@^4.2.3-r2"
+    "ohos-typescript": "^4.9.5-r6",
+    "ts-node": "^10.9.2"
   }
 }

@@ -3,7 +3,7 @@ import {ApiWriter, ApiExcelWriter} from './api_writer';
 import { SystemApiRecognizer } from './api_recognizer';
 import { ReporterFormat } from './configs';
 import { CommandArgs } from './index'
-import ts, {Path} from 'typescript';
+import ts, {Path} from 'ohos-typescript';
 import fs from 'fs';
 import path from 'path';
 
@@ -200,6 +200,7 @@ class ApiCollector {
 
     let systemApiRecognizer = new SystemApiRecognizer(sdkPath);
     systemApiRecognizer.setTypeChecker(program.getTypeChecker());
+    systemApiRecognizer.buildScene();
     Logger.info(this.logTag, `start scanning ${this.project.getPath()}`);
     appSourceSet.forEach((appCodeFilePath) => {
       // 获取源文件的规范名称
