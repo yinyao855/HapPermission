@@ -34,14 +34,37 @@ export class Project {
       try {
         this.profile = JSON5.parse(profileContent);
       } catch (ex) {
-        Logger.error(this.logTag, `parse build-profile.json error: ${JSON.stringify(ex)}`);
+        Logger.error(this.logTag, `parse build-profile.json5 error: ${JSON.stringify(ex)}`);
       }
     }
     return this.profile;
   }
 
+  // 获取项目的权限声明列表
+  getPermissionList(): string[] {
+    let permissionList: string[] = [];
+    const moduleFilePath = path.resolve(this.projectPath, 'entry/src/main/module.json5');
+    if (!fs.existsSync(moduleFilePath)) {
+      Logger.error(this.logTag, 'module.json5 can\'t be found, is it an openharmony project?');
+      return permissionList;
+    }
+    const moduleFileContent = fs.readFileSync(moduleFilePath, 'utf-8');
+    try {
+      const moduleInfo = JSON5.parse(moduleFileContent);
+      const requestPermissions = moduleInfo.module?.requestPermissions;
+      if (requestPermissions) {
+        for (const permission of requestPermissions) {
+            permissionList.push(permission.name);
+        }
+      }
+    } catch (e) {
+      Logger.error(this.logTag, `parse module.json5 error: ${JSON.stringify(e)}`);
+    }
+    return permissionList;
+  }
+
   // 获取sdk版本
-  getAppSdkVersion(): number | string | undefined {
+  getAppSdkVersion(): string | undefined {
     const profile = this.getProfile();
 
     if (!profile) {
@@ -59,7 +82,7 @@ export class Project {
     if (profile.app.products) {
       const compileSdkVersion = profile.app.products[0].compileSdkVersion;
       if (typeof compileSdkVersion === 'number') {
-        return compileSdkVersion;
+        return compileSdkVersion.toString();
       }
       const matchResult = compileSdkVersion.match(/\((.+)\)/g);
       if (matchResult) {

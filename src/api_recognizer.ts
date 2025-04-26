@@ -1,44 +1,42 @@
-import { join } from "path";
-import ts from "ohos-typescript";
 import {
-    SceneConfig,
-    Scene,
-    ArkInvokeStmt,
     ArkClass,
-    ArkMethod,
     ArkFile,
+    ArkMethod,
     FileSignature,
-    LineColPosition
+    LineColPosition,
+    Scene,
+    SceneConfig
 } from "arkanalyzer";
 
 export class SystemApiRecognizer {
-    systemRoot: string;
-    arkUIDecorator = new Set(['@Builder', '@Styles', '@Extend']);
-    arkUIRender = new Set(['build']);
-    forEachComponents = new Set(['LazyForEach', 'ForEach']);
+    appName: string;
+    appDir: string;
+    sdkPath: string;
     scene = new Scene();
-    typeChecker?: ts.TypeChecker;
     apiInfos: ApiDeclarationInformation[] = [];
     apiInfoSet = new Set<string>();
 
-    constructor(systemRoot: string) {
-        this.systemRoot = systemRoot;
-    }
-
-    setTypeChecker(typeChecker: ts.TypeChecker) {
-        this.typeChecker = typeChecker;
+    constructor(appName: string, appDir: string, sdkPath: string) {
+        this.appName = appName;
+        this.appDir = appDir;
+        this.sdkPath = sdkPath;
     }
 
     buildScene() {
         let config: SceneConfig = new SceneConfig();
-        config.buildFromJson(join(__dirname, '../arkpermission_config.json'));
+        config.buildConfig(this.appName, this.appDir, [{
+            name: "etsSdk",
+            path: this.sdkPath,
+            moduleName: ""
+        }])
+        // console.log(this.appName, this.appDir, this.sdkPath);
         this.scene.buildBasicInfo(config);
         this.scene.buildScene4HarmonyProject();
         this.scene.collectProjectImportInfos();
         this.scene.inferTypes();
     }
 
-    recognize(sourceFile: ts.SourceFile, filePath: string) {
+    recognize(filePath: string) {
         const fileName = filePath.replace(this.scene.getRealProjectDir() + "/", "");
         const fromSignature = new FileSignature(this.scene.getProjectName(), fileName);
         const arkFile = this.scene.getFile(fromSignature);
@@ -63,14 +61,14 @@ export class SystemApiRecognizer {
         if (arkMethod.getName() == '_DEFAULT_ARK_METHOD') {
             return;
         }
-        const cfg = arkMethod.getCfg()!;
+        const cfg = arkMethod.getCfg();
         if (cfg == undefined) {
             return;
         }
         for (const stmt of cfg.getStmts()) {
-            // 筛选出ArkInvokeStmt
-            if (stmt instanceof ArkInvokeStmt) {
-                const methodSignature = stmt.getInvokeExpr().getMethodSignature();
+            // 筛选出InvokeExpr
+            if (stmt.containsInvokeExpr()) {
+                const methodSignature = stmt.getInvokeExpr()!.getMethodSignature();
                 let classSignature = methodSignature.getDeclaringClassSignature();
                 let methodSubSignature = methodSignature.getMethodSubSignature();
                 const apiInfo = new ApiDeclarationInformation();
@@ -94,13 +92,19 @@ export class SystemApiRecognizer {
                 apiInfo.setPropertyName(methodSubSignature.getMethodName());
                 // 函数
                 apiInfo.setApiRawText(methodSubSignature.toString());
+                const methodCode = this.scene.getMethod(methodSignature)?.getCode();
+                if (methodCode) {
+                    apiInfo.setApiRawText(methodCode);
+                }
                 // 文件位置
                 const sourceFileName = arkMethod.getDeclaringArkFile().getFilePath();
                 apiInfo.setSourceFileName(sourceFileName);
                 const pos = stmt.getOriginPositionInfo();
                 apiInfo.setPosition(pos);
                 // 添加api信息
-                this.addApiInformation(apiInfo);
+                if(apiInfo.packageName !== "_UnknownFileName" && !apiInfo.packageName.endsWith("ets")) {
+                    this.addApiInformation(apiInfo);
+                }
             }
         }
     }
@@ -117,12 +121,8 @@ export class SystemApiRecognizer {
         this.apiInfoSet.add(this.formatApiInfo(apiInfo));
     }
 
-    getApiInformations() {
-        const apiDecInfos = this.apiInfos ? this.apiInfos : [];
-        // apiDecInfos.forEach((apiInfo) => {
-        //   apiInfo.setApiNode(undefined);
-        // });
-        return apiDecInfos;
+    getApiInformation() {
+        return this.apiInfos ? this.apiInfos : [];
     }
 
     recognizeDecorators(node: ArkClass | ArkMethod) {
@@ -154,14 +154,12 @@ export class ApiDeclarationInformation {
     sourceFileName: string = '';
     deprecated: string = '';
     apiRawText: string = '';
-    qualifiedName: string = '';
-    useInstead: string = '';
     typeName: string = '';
     componentName: string = '';
-    apiNode: any = undefined;
     apiType: string = '';
     dtsPath: string = '';
-    apiText: string = ''
+    apiText: string = '';
+    apiPermission: string = '';
 
     setSdkFileName(fileName: string) {
         this.dtsName = fileName;
@@ -211,34 +209,6 @@ export class ApiDeclarationInformation {
     }
 
     setApiRawText(apiRawText: string) {
-        this.apiRawText = apiRawText.replace(/;/g, '');
-    }
-
-    setQualifiedName(qualifiedName: string) {
-        this.qualifiedName = qualifiedName;
-    }
-
-    setUseInstead(useInstead: string) {
-        this.useInstead = useInstead;
-    }
-
-    setComponentName(componentName: string) {
-        this.componentName = componentName;
-    }
-
-    setApiNode(node: ts.Node) {
-        this.apiNode = node;
-    }
-
-    setApiType(apiType: string) {
-        this.apiType = apiType;
-    }
-
-    setDtsPath(dtsPath: string) {
-        this.dtsPath = dtsPath;
-    }
-
-    setCompletedText(completedText: string) {
-        this.apiText = completedText;
+        this.apiRawText = apiRawText;
     }
 }

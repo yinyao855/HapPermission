@@ -4,6 +4,7 @@ import exceljs from 'exceljs';
 import fs from 'fs';
 import path from 'path';
 import { ApiDeclarationInformation } from './api_recognizer';
+import {PermissionInfo} from "./api_analyzer";
 
 class ApiJsonWriter {
   outputPath: string;
@@ -35,12 +36,14 @@ class ApiJsonWriter {
 class ApiExcelWriter {
   outputDir: string;
   apiInfos: ApiDeclarationInformation[];
+  perInfos: PermissionInfo[];
   enable: boolean;
   noRepeat: boolean;
 
   constructor(outputDir: string, noRepeat: boolean) {
     this.outputDir = outputDir;
     this.apiInfos = [];
+    this.perInfos = [];
     this.enable = true;
     this.noRepeat = noRepeat;
   }
@@ -53,60 +56,33 @@ class ApiExcelWriter {
     this.enable = true;
   }
 
-  add(apiInfos: ApiDeclarationInformation[]): void {
+  add(apiInfos: ApiDeclarationInformation[], perInfos: PermissionInfo[]): void {
     this.apiInfos.push(...apiInfos.filter((value) => {
       return !(value.packageName === 'ArkUI' && value.qualifiedTypeName === '');
     }));
+    this.perInfos.push(...perInfos);
   }
 
   async flush(): Promise<void> {
     if (!this.enable) {
       return;
     }
-    await this.writeSubscribeApi();
-    await this.writeAppApi();
+    await this.writeReport();
   }
 
-  async writeSubscribeApi(): Promise<void> {
-    const apiInfoSet = new Set<string>();
-    const subscribeWorkbook = new exceljs.Workbook();
-    const subscribeSheet = subscribeWorkbook.addWorksheet('Js Api', { views: [{ xSplit: 1 }] });
-    subscribeSheet.getRow(1).values = ['类名', '接口名', '接口类型', '方法声明', '接口全路径'];
-    let lineNumber = 0;
-    const STARTING_LINE_NUMBER = 2;
-    this.apiInfos.forEach((apiInfo) => {
-      let typeName = 'unnamed';
-      if (apiInfo.typeName) {
-        typeName = apiInfo.typeName;
-      }
-      if (apiInfo.qualifiedTypeName) {
-        typeName = apiInfo.qualifiedTypeName;
-      }
-
-      const formattedInfo = formatInfo(apiInfo, typeName);
-      if (!apiInfoSet.has(formattedInfo)) {
-        subscribeSheet.getRow(lineNumber + STARTING_LINE_NUMBER).values = [
-          typeName,
-          apiInfo.propertyName,
-          apiInfo.apiType,
-          apiInfo.apiText.replace(/;$/g, ''),
-          apiInfo.dtsPath
-        ];
-        lineNumber++;
-        apiInfoSet.add(formattedInfo);
-      }
-    });
-    const subscribeBuffer = await subscribeWorkbook.xlsx.writeBuffer();
-    const subscribeOutputFile = path.resolve(this.outputDir, 'subscribe_api.xlsx');
-    fs.writeFileSync(subscribeOutputFile, new Uint8Array(subscribeBuffer));
-  }
-
-  async writeAppApi(): Promise<void> {
+  async writeReport(): Promise<void> {
     let lineNumber = 0;
     const apiInfoSet = new Set<string>();
     const workbook = new exceljs.Workbook();
-    const sheet = workbook.addWorksheet('Js Api', { views: [{ xSplit: 1 }] });
-    sheet.getRow(1).values = ['模块名', '类名', '方法名', '函数', '文件位置'];
+    const sheet1 = workbook.addWorksheet('Permission', { views: [{ xSplit: 1 }] });
+    sheet1.getRow(1).values = ['权限名称', '类型', '使用次数'];
+    this.perInfos.forEach((perInfo) => {
+      sheet1.getRow(lineNumber + 2).values = [perInfo.name, perInfo.type, perInfo.usedCount];
+      lineNumber++;
+    })
+    lineNumber = 0;
+    const sheet = workbook.addWorksheet('API', { views: [{ xSplit: 1 }] });
+    sheet.getRow(1).values = ['模块名', '类名', '方法名', '函数', '权限', '文件位置'];
     this.apiInfos.forEach((apiInfo) => {
       let typeName: string;
       if (apiInfo.componentName) {
@@ -126,9 +102,9 @@ class ApiExcelWriter {
       }
     });
     const buffer = await workbook.xlsx.writeBuffer();
-    const outputFile = path.resolve(this.outputDir, 'app_api.xlsx');
+    const outputFile = path.resolve(this.outputDir, 'haper_report.xlsx');
     fs.writeFileSync(outputFile, new Uint8Array(buffer));
-    Logger.info('ApiExcelWriter', `report is in ${outputFile}`);
+    Logger.info('ApiExcelWriter', `save report is in ${outputFile}`);
   }
 
   createSheet(sheet: exceljs.Worksheet, typeName: string, apiInfo: ApiDeclarationInformation, lineNumber: number): void {
@@ -138,6 +114,7 @@ class ApiExcelWriter {
       typeName,
       apiInfo.propertyName,
       apiInfo.apiRawText,
+      apiInfo.apiPermission,
       `${apiInfo.sourceFileName}(${apiInfo.pos})`
     ];
   }
@@ -148,26 +125,29 @@ class ApiWriter {
   formatFlag: number;
   noRepeat: boolean;
   apiInfos: ApiDeclarationInformation[];
+  perInfos: PermissionInfo[];
 
   constructor(outputPath: string, formatFlag: number, noRepeat: boolean) {
     this.outputPath = outputPath;
     this.formatFlag = formatFlag;
     this.noRepeat = noRepeat;
     this.apiInfos = [];
+    this.perInfos = [];
   }
 
-  add(apiInfos: ApiDeclarationInformation[]): void {
+  add(apiInfos: ApiDeclarationInformation[], perInfos: PermissionInfo[]): void {
     this.apiInfos.push(...apiInfos);
+    this.perInfos.push(...perInfos);
   }
 
   async flush(): Promise<void> {
     if (this.formatFlag === ReporterFormat.FLAG_JSON) {
       this.writeJson(this.apiInfos);
     } else if (this.formatFlag === ReporterFormat.FLAG_EXCEL) {
-      await this.writeExcel(this.apiInfos);
+      await this.writeExcel();
     } else if (this.formatFlag === ReporterFormat.FLAG_DEBUG) {
       this.writeJson(this.apiInfos);
-      await this.writeExcel(this.apiInfos);
+      await this.writeExcel();
     } else {
       this.writeJson(this.apiInfos);
     }
@@ -179,9 +159,9 @@ class ApiWriter {
     apiJsonWriter.flush();
   }
 
-  async writeExcel(apiInfos: ApiDeclarationInformation[]): Promise<void> {
+  async writeExcel(): Promise<void> {
     const apiExcelWriter = new ApiExcelWriter(this.outputPath, this.noRepeat);
-    apiExcelWriter.add(apiInfos);
+    apiExcelWriter.add(this.apiInfos, this.perInfos);
     await apiExcelWriter.flush();
   }
 }

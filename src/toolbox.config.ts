@@ -1,12 +1,12 @@
-import {AppApiCollectorPlugin} from '../index';
+import {AppApiPermissionPlugin} from './index';
 
 export type ToolConfiguration = {
-  plugins: AppApiCollectorPlugin[];
+  plugins: AppApiPermissionPlugin[];
 };
 
 // 获取工具箱配置
 export function getToolConfiguration(): ToolConfiguration {
   return {
-    plugins: [new AppApiCollectorPlugin()],
+    plugins: [new AppApiPermissionPlugin()],
   };
 }

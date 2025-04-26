@@ -1,0 +1,10 @@
+{
+  "appName": "",
+  "appDir": "",
+  "sdk": "sdk-root/version/ets",
+  "output": "",
+  "format": "excel/csv/json",
+  "scanTest": false,
+  "debug": false,
+  "noRepeat": false
+}

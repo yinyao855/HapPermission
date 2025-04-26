@@ -1,4 +1,4 @@
-import { ApiCollector, MultiProjectApiCollector } from './api_collector';
+import { ApiPermission, MultiProjectApiPermission } from './api_permission';
 import { Logger } from './utils';
 import path from 'path';
 import fs from 'fs';
@@ -25,39 +25,39 @@ export interface Plugin {
 
 // 定义命令行参数的类型
 export type CommandArgs = {
-  app?: string;
+  appName?: string;
   appDir?: string;
   sdk?: string;
-  sdkRoot?: string;
   output?: string;
-  format?: 'json' | 'excel';
+  format?: 'json' | 'excel' | 'csv';
   scanTest?: boolean;
   debug?: boolean;
   noRepeat?: boolean;
-  dir?: string;
+  config?: string;
+  createConfig?: string;
 };
 
-export class AppApiCollectorPlugin implements Plugin {
+export class AppApiPermissionPlugin implements Plugin {
   // 日志标签
   logTag: string;
 
   constructor() {
-    this.logTag = 'AppApiCollectorPlugin';
+    this.logTag = 'AppApiPermissionPlugin';
   }
 
   getPluginOptions(): PluginOptions {
     return {
-      name: 'ArkPermission',
+      name: 'HapPermission',
       version: '0.1.0',
       description: 'A permission analysis tool based on ArkAnalyzer.',
       commands: [
         {
           isRequiredOption: false,
-          options: ['--app <string>', 'app root directory'],
+          options: ['--appName <string>', 'app name'],
         },
         {
           isRequiredOption: false,
-          options: ['--appDir <string>', 'a path that contains multiple applications'],
+          options: ['--appDir <string>', 'app root directory'],
         },
         {
           isRequiredOption: false,
@@ -65,15 +65,11 @@ export class AppApiCollectorPlugin implements Plugin {
         },
         {
           isRequiredOption: false,
-          options: ['--sdkRoot <string>', 'sdk root path'],
-        },
-        {
-          isRequiredOption: false,
           options: ['--output <string>', 'the path to output the report'],
         },
         {
           isRequiredOption: false,
-          options: ['--format <json,excel>', 'format of the output report'],
+          options: ['--format <json,excel,csv>', 'format of the output report'],
         },
         {
           isRequiredOption: false,
@@ -86,6 +82,14 @@ export class AppApiCollectorPlugin implements Plugin {
         {
           isRequiredOption: false,
           options: ['--noRepeat', 'apiInfos is not repeat']
+        },
+        {
+          isRequiredOption: false,
+          options: ['--config <string>', 'config file path'],
+        },
+        {
+          isRequiredOption: false,
+          options: ['--createConfig <string>', 'create config file in directory'],
         }
       ],
     };
@@ -96,12 +100,35 @@ export class AppApiCollectorPlugin implements Plugin {
       return;
     }
     const startTime = Date.now();
-    if (argv.app) {
+    if (argv.createConfig) {
+      const configPath = path.resolve(argv.createConfig);
+      if (!fs.existsSync(configPath)) {
+          fs.mkdirSync(configPath, { recursive: true });
+      }
+      const configFilePath = path.join(configPath, 'haper-config.json');
+      if (!fs.existsSync(configFilePath)) {
+        // 拷贝模版文件
+        const templatePath = path.resolve(__dirname, './assets/template-config.json');
+        const templateContent = fs.readFileSync(templatePath, 'utf-8');
+        fs.writeFileSync(configFilePath, templateContent, 'utf-8');
+        Logger.info(this.logTag, `config file created in ${configFilePath}`);
+      } else {
+        Logger.error(this.logTag, `${configFilePath} already exists`);
+      }
+      return;
+    }
+    if (argv.config) {
+      const configPath = path.resolve(argv.config);
+      if (fs.existsSync(configPath)) {
+        const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+        Object.assign(argv, config);
+      } else {
+        Logger.error(this.logTag, `${configPath} not exists`);
+        return;
+      }
+    }
+    if (argv.appDir) {
       await this.scanSingleProject(argv);
-    } else if (argv.appDir) {
-      await this.scanMultiProject(argv);
-    } else if (argv.dir) {
-      await this.scanNonProject(argv);
     } else {
       Logger.info(this.logTag, 'see --help');
     }
@@ -112,13 +139,13 @@ export class AppApiCollectorPlugin implements Plugin {
   }
 
   async scanSingleProject(argv: CommandArgs) {
-    const collector = new ApiCollector(argv);
+    const collector = new ApiPermission(argv);
     await collector.setLibPath(this.findLibPath()).start();
   }
 
   async scanMultiProject(argv: CommandArgs) {
     if (!argv.sdk) {
-      const collector = new MultiProjectApiCollector(argv);
+      const collector = new MultiProjectApiPermission(argv);
       let includeTest = argv.scanTest || false;
       await collector.setLibPath(this.findLibPath()).setIncludeTest(includeTest).start();
     } else {
@@ -131,7 +158,7 @@ export class AppApiCollectorPlugin implements Plugin {
       Logger.error(this.logTag, 'the --sdk is required when scanning non-project');
       return;
     }
-    const apiCollector = new ApiCollector(argv);
+    const apiCollector = new ApiPermission(argv);
     await apiCollector.setLibPath(this.findLibPath()).start();
   }
 
@@ -142,9 +169,9 @@ export class AppApiCollectorPlugin implements Plugin {
     if (argv.appDir) {
       return argv.appDir;
     }
-    if (argv.app) {
-      return argv.app;
-    }
+    // if (argv.app) {
+    //   return argv.app;
+    // }
     return __dirname;
   }
 
@@ -168,10 +195,10 @@ export class AppApiCollectorPlugin implements Plugin {
         return false;
       }
     }
-    return this.checkPathIsValid(argv.app) &&
+    return this.checkPathIsValid(argv.appDir) &&
       this.checkPathIsValid(argv.output) &&
-      this.checkPathIsValid(argv.sdkRoot) &&
-      this.checkPathIsValid(argv.appDir);
+      this.checkPathIsValid(argv.config) &&
+      this.checkPathIsValid(argv.createConfig);
   }
 
   checkPathIsValid(pathStr: string | undefined): boolean {

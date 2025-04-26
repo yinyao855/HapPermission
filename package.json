@@ -1,14 +1,29 @@
 {
+  "name": "hap-permission",
+  "version": "1.0.0",
+  "description": "A permission analysis tool based on ArkAnalyzer",
+  "main": "lib/main.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "clean": "rm -rf ./lib && rm -f ./*.tgz",
+    "build": "npm run clean && tsc && mkdir ./lib/assets && cp -r ./src/assets/* ./lib/assets",
+    "pack": "npm run build && npm pack"
+  },
+  "bin": {
+    "haper": "lib/main.js"
+  },
+  "files": [
+    "lib"
+  ],
   "dependencies": {
     "arkanalyzer": "1.0.7",
-    "browserify-fs": "^1.0.0",
+    "commander": "^13.1.0",
+    "csv-parser": "^3.2.0",
     "exceljs": "^4.4.0",
-    "log4js": "6.7.1",
-    "source-map": "^0.7.4",
-    "ts-loader": "^9.5.1"
+    "json5": "^2.2.3",
+    "source-map": "^0.7.4"
   },
   "devDependencies": {
-    "ohos-typescript": "^4.9.5-r6",
     "ts-node": "^10.9.2"
   }
 }
